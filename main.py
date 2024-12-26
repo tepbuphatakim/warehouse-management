@@ -1,3 +1,5 @@
+from inventory import handle_inventory
+
 def main():
     while True:
         print("\nWarehouse Management System Menu:")
@@ -9,13 +11,13 @@ def main():
 
         choice = input("\nEnter your choice (1-5): ")
         if choice == '1':
-            print("Thank you for using the Warehouse Management System!")
+            print("Dashboard")
         elif choice == '2':
-            print("Thank you for using the Warehouse Management System!")
+            handle_inventory()
         elif choice == '3':
-            print("Thank you for using the Warehouse Management System!")
+            print("Sale management")
         elif choice == '4':
-            print("Thank you for using the Warehouse Management System!")
+            print("Return items")
         elif choice == '5':
             print("Thank you for using the Warehouse Management System!")
             break
