@@ -7,14 +7,14 @@ db = Database()
 def handle_inventory():
     while True:
         print("\nInventory Management:")
-        print("2. Add new item")
-        print("3. Update item")
-        print("4. Delete item")
-        print("5. Search item")
-        print("6. Return to main menu")
+        print("1. Add new item")
+        print("2. Update item")
+        print("3. Delete item")
+        print("4. Search item")
+        print("5. Return to main menu")
 
         view_inventory()
-        choice = input("\nEnter your choice (1-6): ")
+        choice = input("\nEnter your choice (1-5): ")
 
         if choice == '1':
             add_item()
