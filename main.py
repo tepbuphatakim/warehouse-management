@@ -1,4 +1,5 @@
 from inventory import handle_inventory
+from sale import handle_sales
 
 def main():
     while True:
@@ -15,7 +16,7 @@ def main():
         elif choice == '2':
             handle_inventory()
         elif choice == '3':
-            print("Sale management")
+            handle_sales()
         elif choice == '4':
             print("Return items")
         elif choice == '5':
@@ -23,6 +24,7 @@ def main():
             break
         else:
             print("Invalid choice. Please try again.")
+
 
 if __name__ == "__main__":
     main()

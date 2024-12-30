@@ -13,7 +13,7 @@ class Database:
         conn = self.get_connection()
         cursor = conn.cursor()
 
-        # Create inventory table
+        # Create tables
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS inventory (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -24,6 +24,17 @@ class Database:
                 created_at TIMESTAMP,
                 updated_at TIMESTAMP
             )
+        ''')
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS sales (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                item_id INTEGER NOT NULL,
+                quantity INTEGER NOT NULL,
+                unit_price DECIMAL(10,2) NOT NULL,
+                total_amount DECIMAL(10,2) NOT NULL,
+                sale_date DATETIME NOT NULL,
+                FOREIGN KEY (item_id) REFERENCES inventory (id)
+            );
         ''')
 
         conn.commit()
