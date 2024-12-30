@@ -1,5 +1,4 @@
 import sqlite3
-# from datetime import datetime
 
 class Database:
     def __init__(self, db_name="warehouse.db"):
@@ -33,6 +32,19 @@ class Database:
                 unit_price DECIMAL(10,2) NOT NULL,
                 total_amount DECIMAL(10,2) NOT NULL,
                 sale_date DATETIME NOT NULL,
+                FOREIGN KEY (item_id) REFERENCES inventory (id)
+            );
+        ''')
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS returns (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                sale_id INTEGER NOT NULL,
+                item_id INTEGER NOT NULL,
+                quantity INTEGER NOT NULL,
+                refund_amount DECIMAL(10,2) NOT NULL,
+                reason TEXT NOT NULL,
+                return_date DATETIME NOT NULL,
+                FOREIGN KEY (sale_id) REFERENCES sales (id),
                 FOREIGN KEY (item_id) REFERENCES inventory (id)
             );
         ''')

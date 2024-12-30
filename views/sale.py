@@ -4,6 +4,7 @@ from datetime import datetime
 
 db = Database()
 
+
 def handle_sales():
     while True:
         print("\nSales Management:")

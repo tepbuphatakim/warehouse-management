@@ -4,6 +4,7 @@ from datetime import datetime
 
 db = Database()
 
+
 def handle_inventory():
     while True:
         print("\nInventory Management:")

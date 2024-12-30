@@ -1,5 +1,7 @@
-from inventory import handle_inventory
-from sale import handle_sales
+from views.inventory import handle_inventory
+from views.sale import handle_sales
+from views.return_items import handle_returns
+
 
 def main():
     while True:
@@ -18,7 +20,7 @@ def main():
         elif choice == '3':
             handle_sales()
         elif choice == '4':
-            print("Return items")
+            handle_returns()
         elif choice == '5':
             print("Thank you for using the Warehouse Management System!")
             break
