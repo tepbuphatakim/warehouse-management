@@ -1,6 +1,7 @@
 from views.inventory import handle_inventory
 from views.sale import handle_sales
 from views.return_items import handle_returns
+from views.dashboard import display_dashboard
 
 
 def main():
@@ -14,7 +15,7 @@ def main():
 
         choice = input("\nEnter your choice (1-5): ")
         if choice == '1':
-            print("Dashboard")
+            display_dashboard()
         elif choice == '2':
             handle_inventory()
         elif choice == '3':
