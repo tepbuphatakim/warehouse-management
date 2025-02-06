@@ -1,171 +1,284 @@
-from database.main import Database
+from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout,
+                             QHBoxLayout, QPushButton, QLineEdit, QTableWidget,
+                             QTableWidgetItem, QMessageBox, QDialog, QFormLayout)
+from PyQt6.QtCore import Qt
 import sqlite3
 from datetime import datetime
-
-db = Database()
-
-
-def handle_inventory():
-    while True:
-        print("\nInventory Management:")
-        print("1. Add new item")
-        print("2. Update item")
-        print("3. Delete item")
-        print("4. Search item")
-        print("5. Return to main menu")
-
-        view_inventory()
-        choice = input("\nEnter your choice (1-5): ")
-
-        if choice == '1':
-            add_item()
-        elif choice == '2':
-            update_item()
-        elif choice == '3':
-            delete_item()
-        elif choice == '4':
-            search_item()
-        elif choice == '5':
-            break
-        else:
-            print("Invalid choice. Please try again.")
+from database.main import Database
 
 
-def view_inventory():
-    conn = db.get_connection()
-    cursor = conn.cursor()
+class InventoryPage(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.db = Database()
+        self.init_ui()
 
-    cursor.execute('SELECT * FROM inventory')
-    items = cursor.fetchall()
+    def init_ui(self):
+        self.setWindowTitle('Inventory Management System')
+        self.setGeometry(100, 100, 800, 600)
 
-    if not items:
-        print("\nInventory is empty.")
-    else:
-        print("\nCurrent Inventory:")
-        print("ID  |  Name  |  Quantity  |  Price  |  Location  |  Last Updated")
-        print("-" * 75)
-        for item in items:
-            print(
-                f"{item[0]:3} | {item[1]:6} | {item[2]:9} | ${item[3]:6.2f} | {item[4]:9} | {item[6]}")
+        central_widget = QWidget()
+        self.setCentralWidget(central_widget)
+        layout = QVBoxLayout(central_widget)
 
-    conn.close()
+        search_layout = QHBoxLayout()
+        self.search_input = QLineEdit()
+        self.search_input.setPlaceholderText("Search items...")
+        search_button = QPushButton("Search")
+        search_button.clicked.connect(self.search_items)
+        search_layout.addWidget(self.search_input)
+        search_layout.addWidget(search_button)
+        layout.addLayout(search_layout)
 
+        self.table = QTableWidget()
+        self.table.setColumnCount(6)
+        self.table.setHorizontalHeaderLabels(
+            ["ID", "Name", "Quantity", "Price", "Location", "Last Updated"])
+        layout.addWidget(self.table)
 
-def add_item():
-    print("\nAdd New Item:")
-    try:
-        name = input("Enter item name: ")
-        quantity = int(input("Enter quantity: "))
-        price = float(input("Enter price: $"))
-        location = input("Enter storage location: ")
-        current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        button_layout = QHBoxLayout()
+        add_button = QPushButton("Add Item")
+        update_button = QPushButton("Update Item")
+        delete_button = QPushButton("Delete Item")
+        refresh_button = QPushButton("Refresh")
 
-        conn = db.get_connection()
+        add_button.clicked.connect(self.add_item)
+        update_button.clicked.connect(self.update_item)
+        delete_button.clicked.connect(self.delete_item)
+        refresh_button.clicked.connect(self.refresh_table)
+
+        button_layout.addWidget(add_button)
+        button_layout.addWidget(update_button)
+        button_layout.addWidget(delete_button)
+        button_layout.addWidget(refresh_button)
+        layout.addLayout(button_layout)
+
+        # Load initial data
+        self.refresh_table()
+
+    def refresh_table(self):
+        self.table.setRowCount(0)
+        conn = self.db.get_connection()
         cursor = conn.cursor()
 
-        cursor.execute('''
-            INSERT INTO inventory (name, quantity, price, location, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?)
-        ''', (name, quantity, price, location, current_time, current_time))
+        cursor.execute('SELECT * FROM inventory')
+        items = cursor.fetchall()
 
-        conn.commit()
-        conn.close()
-        print("\nItem added successfully!")
-
-    except ValueError:
-        print("Invalid input. Please enter numeric values for quantity and price.")
-    except sqlite3.Error as e:
-        print(f"Database error: {e}")
-
-
-def update_item():
-    view_inventory()
-    try:
-        item_id = int(input("\nEnter item ID to update: "))
-
-        conn = db.get_connection()
-        cursor = conn.cursor()
-
-        cursor.execute('SELECT * FROM inventory WHERE id = ?', (item_id,))
-        item = cursor.fetchone()
-
-        if item:
-            print("\nUpdate Item (press Enter to skip):")
-            name = input(f"Enter new name [{item[1]}]: ") or item[1]
-            quantity_str = input(f"Enter new quantity [{item[2]}]: ")
-            quantity = int(quantity_str) if quantity_str else item[2]
-            price_str = input(f"Enter new price [{item[3]}]: ")
-            price = float(price_str) if price_str else item[3]
-            location = input(f"Enter new location [{item[4]}]: ") or item[4]
-            current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-
-            cursor.execute('''
-                UPDATE inventory 
-                SET name = ?, quantity = ?, price = ?, location = ?, updated_at = ?
-                WHERE id = ?
-            ''', (name, quantity, price, location, current_time, item_id))
-
-            conn.commit()
-            print("\nItem updated successfully!")
-        else:
-            print("\nItem not found.")
+        for row_num, item in enumerate(items):
+            self.table.insertRow(row_num)
+            for col_num, value in enumerate(item):
+                if col_num < 6:  # Skip created_at column
+                    if isinstance(value, float):
+                        value = f"${value:.2f}"
+                    cell = QTableWidgetItem(str(value))
+                    cell.setFlags(cell.flags() & ~Qt.ItemFlag.ItemIsEditable)
+                    self.table.setItem(row_num, col_num, cell)
 
         conn.close()
+        self.table.resizeColumnsToContents()
 
-    except ValueError:
-        print("Invalid input. Please enter valid values.")
-    except sqlite3.Error as e:
-        print(f"Database error: {e}")
+    def add_item(self):
+        dialog = AddItemDialog(self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            try:
+                data = dialog.get_item_data()
+                current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
+                conn = self.db.get_connection()
+                cursor = conn.cursor()
 
-def delete_item():
-    view_inventory()
-    try:
-        item_id = int(input("\nEnter item ID to delete: "))
+                cursor.execute('''
+                    INSERT INTO inventory (name, quantity, price, location, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                ''', (data['name'], int(data['quantity']), float(data['price']),
+                      data['location'], current_time, current_time))
 
-        conn = db.get_connection()
-        cursor = conn.cursor()
+                conn.commit()
+                conn.close()
 
-        cursor.execute('SELECT id FROM inventory WHERE id = ?', (item_id,))
-        if cursor.fetchone():
-            confirm = input(
-                "Are you sure you want to delete this item? (y/n): ")
-            if confirm.lower() == 'y':
+                self.refresh_table()
+                QMessageBox.information(
+                    self, "Success", "Item added successfully!")
+            except ValueError:
+                QMessageBox.warning(
+                    self, "Error", "Please enter valid numeric values.")
+            except sqlite3.Error as e:
+                QMessageBox.critical(self, "Database Error", str(e))
+
+    def update_item(self):
+        current_row = self.table.currentRow()
+        if current_row < 0:
+            QMessageBox.warning(
+                self, "Warning", "Please select an item to update.")
+            return
+
+        item_data = {
+            'id': self.table.item(current_row, 0).text(),
+            'name': self.table.item(current_row, 1).text(),
+            'quantity': self.table.item(current_row, 2).text(),
+            'price': self.table.item(current_row, 3).text().replace('$', ''),
+            'location': self.table.item(current_row, 4).text()
+        }
+
+        dialog = UpdateItemDialog(item_data, self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            try:
+                data = dialog.get_item_data()
+                current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+                conn = self.db.get_connection()
+                cursor = conn.cursor()
+
+                cursor.execute('''
+                    UPDATE inventory 
+                    SET name = ?, quantity = ?, price = ?, location = ?, updated_at = ?
+                    WHERE id = ?
+                ''', (data['name'], int(data['quantity']), float(data['price']),
+                      data['location'], current_time, item_data['id']))
+
+                conn.commit()
+                conn.close()
+
+                self.refresh_table()
+                QMessageBox.information(
+                    self, "Success", "Item updated successfully!")
+            except ValueError:
+                QMessageBox.warning(
+                    self, "Error", "Please enter valid numeric values.")
+            except sqlite3.Error as e:
+                QMessageBox.critical(self, "Database Error", str(e))
+
+    def delete_item(self):
+        current_row = self.table.currentRow()
+        if current_row < 0:
+            QMessageBox.warning(
+                self, "Warning", "Please select an item to delete.")
+            return
+
+        item_id = self.table.item(current_row, 0).text()
+        reply = QMessageBox.question(self, "Confirm Deletion",
+                                     "Are you sure you want to delete this item?",
+                                     QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+
+        if reply == QMessageBox.StandardButton.Yes:
+            try:
+                conn = self.db.get_connection()
+                cursor = conn.cursor()
+
                 cursor.execute(
                     'DELETE FROM inventory WHERE id = ?', (item_id,))
                 conn.commit()
-                print("\nItem deleted successfully!")
-            else:
-                print("\nDeletion cancelled.")
-        else:
-            print("\nItem not found.")
+                conn.close()
+
+                self.refresh_table()
+                QMessageBox.information(
+                    self, "Success", "Item deleted successfully!")
+            except sqlite3.Error as e:
+                QMessageBox.critical(self, "Database Error", str(e))
+
+    def search_items(self):
+        search_term = self.search_input.text()
+        self.table.setRowCount(0)
+
+        conn = self.db.get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute('SELECT * FROM inventory WHERE name LIKE ?',
+                       (f'%{search_term}%',))
+        items = cursor.fetchall()
+
+        for row_num, item in enumerate(items):
+            self.table.insertRow(row_num)
+            for col_num, value in enumerate(item):
+                if col_num < 6:  # Skip created_at column
+                    if isinstance(value, float):
+                        value = f"${value:.2f}"
+                    cell = QTableWidgetItem(str(value))
+                    cell.setFlags(cell.flags() & ~Qt.ItemFlag.ItemIsEditable)
+                    self.table.setItem(row_num, col_num, cell)
 
         conn.close()
-
-    except ValueError:
-        print("Invalid input. Please enter a valid item ID.")
-    except sqlite3.Error as e:
-        print(f"Database error: {e}")
+        self.table.resizeColumnsToContents()
 
 
-def search_item():
-    search_term = input("\nEnter item name to search: ")
+class AddItemDialog(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Add New Item")
+        self.setup_ui()
 
-    conn = db.get_connection()
-    cursor = conn.cursor()
+    def setup_ui(self):
+        layout = QFormLayout()
 
-    cursor.execute('SELECT * FROM inventory WHERE name LIKE ?',
-                   (f'%{search_term}%',))
-    items = cursor.fetchall()
+        self.name_input = QLineEdit()
+        self.quantity_input = QLineEdit()
+        self.price_input = QLineEdit()
+        self.location_input = QLineEdit()
 
-    if items:
-        print("\nSearch Results:")
-        print("ID  |  Name  |  Quantity  |  Price  |  Location  |  Last Updated")
-        print("-" * 75)
-        for item in items:
-            print(
-                f"{item[0]:3} | {item[1]:6} | {item[2]:9} | ${item[3]:6.2f} | {item[4]:9} | {item[6]}")
-    else:
-        print("\nNo items found.")
+        layout.addRow("Name:", self.name_input)
+        layout.addRow("Quantity:", self.quantity_input)
+        layout.addRow("Price ($):", self.price_input)
+        layout.addRow("Location:", self.location_input)
 
-    conn.close()
+        button_box = QHBoxLayout()
+        save_button = QPushButton("Save")
+        cancel_button = QPushButton("Cancel")
+
+        save_button.clicked.connect(self.accept)
+        cancel_button.clicked.connect(self.reject)
+
+        button_box.addWidget(save_button)
+        button_box.addWidget(cancel_button)
+        layout.addRow(button_box)
+
+        self.setLayout(layout)
+
+    def get_item_data(self):
+        return {
+            'name': self.name_input.text(),
+            'quantity': self.quantity_input.text(),
+            'price': self.price_input.text(),
+            'location': self.location_input.text()
+        }
+
+
+class UpdateItemDialog(QDialog):
+    def __init__(self, item_data, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Update Item")
+        self.item_data = item_data
+        self.setup_ui()
+
+    def setup_ui(self):
+        layout = QFormLayout()
+
+        self.name_input = QLineEdit(self.item_data['name'])
+        self.quantity_input = QLineEdit(str(self.item_data['quantity']))
+        self.price_input = QLineEdit(str(self.item_data['price']))
+        self.location_input = QLineEdit(self.item_data['location'])
+
+        layout.addRow("Name:", self.name_input)
+        layout.addRow("Quantity:", self.quantity_input)
+        layout.addRow("Price ($):", self.price_input)
+        layout.addRow("Location:", self.location_input)
+
+        button_box = QHBoxLayout()
+        save_button = QPushButton("Save")
+        cancel_button = QPushButton("Cancel")
+
+        save_button.clicked.connect(self.accept)
+        cancel_button.clicked.connect(self.reject)
+
+        button_box.addWidget(save_button)
+        button_box.addWidget(cancel_button)
+        layout.addRow(button_box)
+
+        self.setLayout(layout)
+
+    def get_item_data(self):
+        return {
+            'name': self.name_input.text(),
+            'quantity': self.quantity_input.text(),
+            'price': self.price_input.text(),
+            'location': self.location_input.text()
+        }
