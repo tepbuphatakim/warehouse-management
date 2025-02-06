@@ -6,7 +6,7 @@ from PyQt6.QtGui import QAction
 from PyQt6.QtCore import Qt, QSize
 
 from views.inventory import InventoryPage
-from views.sale import handle_sales
+from views.sale import SaleManagementPage
 from views.return_items import handle_returns
 from views.dashboard import DashboardPage
 
@@ -86,11 +86,11 @@ class MainWindow(QMainWindow):
 #         layout.addWidget(QLabel("Inventory Items List and Management"))
 
 
-class SaleManagementPage(QWidget):
-    def __init__(self):
-        super().__init__()
-        layout = QVBoxLayout(self)
-        layout.addWidget(QLabel("Sale Management and Transaction History"))
+# class SaleManagementPage(QWidget):
+#     def __init__(self):
+#         super().__init__()
+#         layout = QVBoxLayout(self)
+#         layout.addWidget(QLabel("Sale Management and Transaction History"))
 
 
 class ReturnItemsPage(QWidget):
