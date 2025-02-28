@@ -5,12 +5,13 @@ from PyQt6.QtCore import Qt
 import sqlite3
 from datetime import datetime
 from database.main import Database
+from dao.inventory_dao import InventoryDAO
 
 
 class InventoryPage(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.db = Database()
+        self.inventory_dao = InventoryDAO()
         self.init_ui()
 
     def init_ui(self):
@@ -58,11 +59,7 @@ class InventoryPage(QMainWindow):
 
     def refresh_table(self):
         self.table.setRowCount(0)
-        conn = self.db.get_connection()
-        cursor = conn.cursor()
-
-        cursor.execute('SELECT * FROM inventory')
-        items = cursor.fetchall()
+        items = self.inventory_dao.get_all_items()
 
         for row_num, item in enumerate(items):
             self.table.insertRow(row_num)
@@ -74,7 +71,6 @@ class InventoryPage(QMainWindow):
                     cell.setFlags(cell.flags() & ~Qt.ItemFlag.ItemIsEditable)
                     self.table.setItem(row_num, col_num, cell)
 
-        conn.close()
         self.table.resizeColumnsToContents()
 
     def add_item(self):
@@ -84,17 +80,8 @@ class InventoryPage(QMainWindow):
                 data = dialog.get_item_data()
                 current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
-                conn = self.db.get_connection()
-                cursor = conn.cursor()
-
-                cursor.execute('''
-                    INSERT INTO inventory (name, quantity, price, location, created_at, updated_at)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                ''', (data['name'], int(data['quantity']), float(data['price']),
-                      data['location'], current_time, current_time))
-
-                conn.commit()
-                conn.close()
+                self.inventory_dao.add_item(data['name'], int(data['quantity']), 
+                                     float(data['price']), data['location'])
 
                 self.refresh_table()
                 QMessageBox.information(
@@ -124,20 +111,13 @@ class InventoryPage(QMainWindow):
         if dialog.exec() == QDialog.DialogCode.Accepted:
             try:
                 data = dialog.get_item_data()
-                current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-
-                conn = self.db.get_connection()
-                cursor = conn.cursor()
-
-                cursor.execute('''
-                    UPDATE inventory 
-                    SET name = ?, quantity = ?, price = ?, location = ?, updated_at = ?
-                    WHERE id = ?
-                ''', (data['name'], int(data['quantity']), float(data['price']),
-                      data['location'], current_time, item_data['id']))
-
-                conn.commit()
-                conn.close()
+                self.inventory_dao.update_item(
+                    item_data['id'],
+                    data['name'],
+                    int(data['quantity']), 
+                    float(data['price']),
+                    data['location']
+                )
 
                 self.refresh_table()
                 QMessageBox.information(
@@ -162,13 +142,7 @@ class InventoryPage(QMainWindow):
 
         if reply == QMessageBox.StandardButton.Yes:
             try:
-                conn = self.db.get_connection()
-                cursor = conn.cursor()
-
-                cursor.execute(
-                    'DELETE FROM inventory WHERE id = ?', (item_id,))
-                conn.commit()
-                conn.close()
+                self.inventory_dao.delete_item(item_id)
 
                 self.refresh_table()
                 QMessageBox.information(
@@ -180,25 +154,22 @@ class InventoryPage(QMainWindow):
         search_term = self.search_input.text()
         self.table.setRowCount(0)
 
-        conn = self.db.get_connection()
-        cursor = conn.cursor()
+        try:
+            items = self.inventory_dao.search_items(search_term)
 
-        cursor.execute('SELECT * FROM inventory WHERE name LIKE ?',
-                       (f'%{search_term}%',))
-        items = cursor.fetchall()
+            for row_num, item in enumerate(items):
+                self.table.insertRow(row_num)
+                for col_num, value in enumerate(item):
+                    if col_num < 6:  # Skip created_at column
+                        if isinstance(value, float):
+                            value = f"${value:.2f}"
+                        cell = QTableWidgetItem(str(value))
+                        cell.setFlags(cell.flags() & ~Qt.ItemFlag.ItemIsEditable)
+                        self.table.setItem(row_num, col_num, cell)
 
-        for row_num, item in enumerate(items):
-            self.table.insertRow(row_num)
-            for col_num, value in enumerate(item):
-                if col_num < 6:  # Skip created_at column
-                    if isinstance(value, float):
-                        value = f"${value:.2f}"
-                    cell = QTableWidgetItem(str(value))
-                    cell.setFlags(cell.flags() & ~Qt.ItemFlag.ItemIsEditable)
-                    self.table.setItem(row_num, col_num, cell)
-
-        conn.close()
-        self.table.resizeColumnsToContents()
+            self.table.resizeColumnsToContents()
+        except sqlite3.Error as e:
+            QMessageBox.critical(self, "Database Error", str(e))
 
 
 class AddItemDialog(QDialog):
