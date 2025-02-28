@@ -5,13 +5,13 @@ from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout,
 from PyQt6.QtCore import Qt
 import sqlite3
 from datetime import datetime
-from database.main import Database
+from dao.return_items_dao import ReturnItemsDAO
 
 
 class ReturnItemsPage(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.db = Database()
+        self.return_items_dao = ReturnItemsDAO()
         self.init_ui()
 
     def init_ui(self):
@@ -79,17 +79,8 @@ class ReturnItemsPage(QMainWindow):
 
     def refresh_returns_history(self):
         try:
-            conn = self.db.get_connection()
-            cursor = conn.cursor()
-
-            cursor.execute('''
-                SELECT r.id, i.name, r.quantity, r.refund_amount, r.reason, r.return_date
-                FROM returns r
-                JOIN inventory i ON r.item_id = i.id
-                ORDER BY r.return_date DESC
-            ''')
-            returns = cursor.fetchall()
-
+            returns = self.return_items_dao.get_all_returns()
+            
             self.returns_table.setRowCount(len(returns))
             for row, return_item in enumerate(returns):
                 for col, value in enumerate(return_item):
@@ -100,40 +91,21 @@ class ReturnItemsPage(QMainWindow):
                     self.returns_table.setItem(row, col, cell)
 
             self.returns_table.resizeColumnsToContents()
-            conn.close()
 
-        except sqlite3.Error as e:
-            QMessageBox.critical(self, "Database Error", str(e))
+        except Exception as e:
+            QMessageBox.critical(self, "Error", str(e))
 
     def process_return(self):
-        dialog = ProcessReturnDialog(self.db, self)
+        dialog = ProcessReturnDialog(self.return_items_dao, self)
         if dialog.exec() == QDialog.DialogCode.Accepted:
             self.refresh_returns_history()
 
     def search_returns(self):
         try:
-            conn = self.db.get_connection()
-            cursor = conn.cursor()
-
             search_term = self.search_input.text()
-            if self.search_type.currentText() == "Date":
-                cursor.execute('''
-                    SELECT r.id, i.name, r.quantity, r.refund_amount, r.reason, r.return_date
-                    FROM returns r
-                    JOIN inventory i ON r.item_id = i.id
-                    WHERE DATE(r.return_date) = ?
-                    ORDER BY r.return_date DESC
-                ''', (search_term,))
-            else:  # Item Name
-                cursor.execute('''
-                    SELECT r.id, i.name, r.quantity, r.refund_amount, r.reason, r.return_date
-                    FROM returns r
-                    JOIN inventory i ON r.item_id = i.id
-                    WHERE i.name LIKE ?
-                    ORDER BY r.return_date DESC
-                ''', (f'%{search_term}%',))
-
-            returns = cursor.fetchall()
+            search_type = self.search_type.currentText()
+            
+            returns = self.return_items_dao.search_returns(search_type, search_term)
 
             self.search_table.setRowCount(len(returns))
             for row, return_item in enumerate(returns):
@@ -145,16 +117,15 @@ class ReturnItemsPage(QMainWindow):
                     self.search_table.setItem(row, col, cell)
 
             self.search_table.resizeColumnsToContents()
-            conn.close()
 
-        except sqlite3.Error as e:
-            QMessageBox.critical(self, "Database Error", str(e))
+        except Exception as e:
+            QMessageBox.critical(self, "Error", str(e))
 
 
 class ProcessReturnDialog(QDialog):
-    def __init__(self, db, parent=None):
+    def __init__(self, return_items_dao, parent=None):
         super().__init__(parent)
-        self.db = db
+        self.return_items_dao = return_items_dao
         self.setWindowTitle("Process New Return")
         self.setMinimumWidth(800)
         self.setup_ui()
@@ -193,17 +164,7 @@ class ProcessReturnDialog(QDialog):
 
     def load_recent_sales(self):
         try:
-            conn = self.db.get_connection()
-            cursor = conn.cursor()
-
-            cursor.execute('''
-                SELECT s.id, i.name, s.quantity, s.unit_price, s.total_amount, s.sale_date
-                FROM sales s
-                JOIN inventory i ON s.item_id = i.id
-                ORDER BY s.sale_date DESC
-                LIMIT 10
-            ''')
-            sales = cursor.fetchall()
+            sales = self.return_items_dao.get_recent_sales()
 
             self.sales_table.setRowCount(len(sales))
             for row, sale in enumerate(sales):
@@ -215,24 +176,21 @@ class ProcessReturnDialog(QDialog):
                     self.sales_table.setItem(row, col, cell)
 
             self.sales_table.resizeColumnsToContents()
-            conn.close()
 
-        except sqlite3.Error as e:
+        except Exception as e:
             QMessageBox.critical(self, "Database Error", str(e))
 
     def process_return(self):
         current_row = self.sales_table.currentRow()
         if current_row < 0:
-            QMessageBox.warning(
-                self, "Warning", "Please select a sale to process return.")
+            QMessageBox.warning(self, "Warning", "Please select a sale to process return.")
             return
 
         try:
             sale_id = int(self.sales_table.item(current_row, 0).text())
             max_quantity = int(self.sales_table.item(current_row, 2).text())
             return_quantity = int(self.quantity_input.text())
-            unit_price = float(self.sales_table.item(
-                current_row, 3).text().replace('$', ''))
+            unit_price = float(self.sales_table.item(current_row, 3).text().replace('$', ''))
             reason = self.reason_input.toPlainText()
 
             if return_quantity <= 0 or return_quantity > max_quantity:
@@ -240,39 +198,14 @@ class ProcessReturnDialog(QDialog):
                 return
 
             refund_amount = return_quantity * unit_price
-            current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
-            conn = self.db.get_connection()
-            cursor = conn.cursor()
-
-            # Get item_id
-            cursor.execute(
-                'SELECT item_id FROM sales WHERE id = ?', (sale_id,))
-            item_id = cursor.fetchone()[0]
-
-            # Process return
-            cursor.execute('''
-                INSERT INTO returns (sale_id, item_id, quantity, refund_amount, reason, return_date)
-                VALUES (?, ?, ?, ?, ?, ?)
-            ''', (sale_id, item_id, return_quantity, refund_amount, reason, current_time))
-
-            # Update inventory
-            cursor.execute('''
-                UPDATE inventory 
-                SET quantity = quantity + ?,
-                    updated_at = ?
-                WHERE id = ?
-            ''', (return_quantity, current_time, item_id))
-
-            conn.commit()
-            conn.close()
+            self.return_items_dao.process_return(sale_id, return_quantity, refund_amount, reason)
 
             QMessageBox.information(self, "Success",
-                                    f"Return processed successfully!\nRefund amount: ${refund_amount:.2f}")
+                                  f"Return processed successfully!\nRefund amount: ${refund_amount:.2f}")
             self.accept()
 
         except ValueError:
-            QMessageBox.warning(
-                self, "Error", "Please enter valid numeric values.")
-        except sqlite3.Error as e:
-            QMessageBox.critical(self, "Database Error", str(e))
+            QMessageBox.warning(self, "Error", "Please enter valid numeric values.")
+        except Exception as e:
+            QMessageBox.critical(self, "Error", str(e))

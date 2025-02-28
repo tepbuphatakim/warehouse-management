@@ -4,7 +4,6 @@ from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout,
 from PyQt6.QtCore import Qt
 import sqlite3
 from datetime import datetime
-from database.main import Database
 from dao.inventory_dao import InventoryDAO
 
 
