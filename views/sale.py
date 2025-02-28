@@ -4,13 +4,12 @@ from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout,
                              QComboBox, QTabWidget, QDateEdit)
 from PyQt6.QtCore import Qt, QDate
 import sqlite3
-from datetime import datetime
-from database.main import Database
+from dao.sale_dao import SaleDAO
 
 class SaleManagementPage(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.db = Database()
+        self.sale_dao = SaleDAO()
         self.init_ui()
 
     def init_ui(self):
@@ -81,17 +80,7 @@ class SaleManagementPage(QMainWindow):
 
     def refresh_sales_history(self):
         try:
-            conn = self.db.get_connection()
-            cursor = conn.cursor()
-
-            cursor.execute('''
-                SELECT s.id, i.name, s.quantity, s.unit_price, s.total_amount, s.sale_date
-                FROM sales s
-                JOIN inventory i ON s.item_id = i.id
-                ORDER BY s.sale_date DESC
-            ''')
-            sales = cursor.fetchall()
-
+            sales = self.sale_dao.get_all_sales()
             self.sales_table.setRowCount(len(sales))
             for row, sale in enumerate(sales):
                 for col, value in enumerate(sale):
@@ -102,44 +91,26 @@ class SaleManagementPage(QMainWindow):
                     self.sales_table.setItem(row, col, cell)
 
             self.sales_table.resizeColumnsToContents()
-            conn.close()
 
         except sqlite3.Error as e:
             QMessageBox.critical(self, "Database Error", str(e))
 
     def record_sale(self):
-        dialog = RecordSaleDialog(self.db, self)
+        dialog = RecordSaleDialog(self)
         if dialog.exec() == QDialog.DialogCode.Accepted:
             self.refresh_sales_history()
 
     def generate_report(self):
-        dialog = SalesReportDialog(self.db, self)
+        dialog = SalesReportDialog(self)
         dialog.exec()
 
     def search_sales(self):
         try:
-            conn = self.db.get_connection()
-            cursor = conn.cursor()
-
             search_term = self.search_input.text()
-            if self.search_type.currentText() == "Date":
-                cursor.execute('''
-                    SELECT s.id, i.name, s.quantity, s.unit_price, s.total_amount, s.sale_date
-                    FROM sales s
-                    JOIN inventory i ON s.item_id = i.id
-                    WHERE DATE(s.sale_date) = ?
-                    ORDER BY s.sale_date DESC
-                ''', (search_term,))
+            if self.search_type.currentText() == "Date":                            
+                sales = self.sale_dao.search_sales_by_date(search_term)
             else:  # Item Name
-                cursor.execute('''
-                    SELECT s.id, i.name, s.quantity, s.unit_price, s.total_amount, s.sale_date
-                    FROM sales s
-                    JOIN inventory i ON s.item_id = i.id
-                    WHERE i.name LIKE ?
-                    ORDER BY s.sale_date DESC
-                ''', (f'%{search_term}%',))
-
-            sales = cursor.fetchall()
+                sales = self.sale_dao.search_sales_by_item_name(search_term)
 
             self.search_table.setRowCount(len(sales))
             for row, sale in enumerate(sales):
@@ -151,16 +122,15 @@ class SaleManagementPage(QMainWindow):
                     self.search_table.setItem(row, col, cell)
 
             self.search_table.resizeColumnsToContents()
-            conn.close()
 
         except sqlite3.Error as e:
             QMessageBox.critical(self, "Database Error", str(e))
 
 
 class RecordSaleDialog(QDialog):
-    def __init__(self, db, parent=None):
+    def __init__(self, parent=None):
         super().__init__(parent)
-        self.db = db
+        self.sale_dao = SaleDAO()
         self.setWindowTitle("Record New Sale")
         self.setMinimumWidth(600)
         self.setup_ui()
@@ -194,87 +164,58 @@ class RecordSaleDialog(QDialog):
         self.setLayout(layout)
 
     def load_available_items(self):
-        conn = self.db.get_connection()
-        cursor = conn.cursor()
+        try:
+            items = self.sale_dao.get_available_items()
+            self.table.setRowCount(len(items))
+            for row, item in enumerate(items):
+                for col, value in enumerate(item):
+                    if isinstance(value, float):
+                        value = f"${value:.2f}"
+                    cell = QTableWidgetItem(str(value))
+                    cell.setFlags(cell.flags() & ~Qt.ItemFlag.ItemIsEditable)
+                    self.table.setItem(row, col, cell)
 
-        cursor.execute(
-            'SELECT id, name, quantity, price FROM inventory WHERE quantity > 0')
-        items = cursor.fetchall()
+            self.table.resizeColumnsToContents()
 
-        self.table.setRowCount(len(items))
-        for row, item in enumerate(items):
-            for col, value in enumerate(item):
-                if isinstance(value, float):
-                    value = f"${value:.2f}"
-                cell = QTableWidgetItem(str(value))
-                cell.setFlags(cell.flags() & ~Qt.ItemFlag.ItemIsEditable)
-                self.table.setItem(row, col, cell)
-
-        self.table.resizeColumnsToContents()
-        conn.close()
+        except sqlite3.Error as e:
+            QMessageBox.critical(self, "Database Error", str(e))
 
     def record_sale(self):
         current_row = self.table.currentRow()
         if current_row < 0:
-            QMessageBox.warning(
-                self, "Warning", "Please select an item to sell.")
+            QMessageBox.warning(self, "Warning", "Please select an item to sell.")
             return
 
         try:
             item_id = int(self.table.item(current_row, 0).text())
             quantity = int(self.quantity_input.text())
             available = int(self.table.item(current_row, 2).text())
-            unit_price = float(self.table.item(
-                current_row, 3).text().replace('$', ''))
+            unit_price = float(self.table.item(current_row, 3).text().replace('$', ''))
 
             if quantity <= 0:
-                QMessageBox.warning(
-                    self, "Error", "Please enter a valid quantity.")
+                QMessageBox.warning(self, "Error", "Please enter a valid quantity.")
                 return
 
             if quantity > available:
-                QMessageBox.warning(
-                    self, "Error", "Insufficient quantity in inventory!")
+                QMessageBox.warning(self, "Error", "Insufficient quantity in inventory!")
                 return
 
-            total_amount = quantity * unit_price
-            current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-
-            conn = self.db.get_connection()
-            cursor = conn.cursor()
-
-            # Record the sale
-            cursor.execute('''
-                INSERT INTO sales (item_id, quantity, unit_price, total_amount, sale_date)
-                VALUES (?, ?, ?, ?, ?)
-            ''', (item_id, quantity, unit_price, total_amount, current_time))
-
-            # Update inventory
-            cursor.execute('''
-                UPDATE inventory 
-                SET quantity = quantity - ?,
-                    updated_at = ?
-                WHERE id = ?
-            ''', (quantity, current_time, item_id))
-
-            conn.commit()
-            conn.close()
-
-            QMessageBox.information(self, "Success",
+            if self.sale_dao.record_sale(item_id, quantity, unit_price):
+                total_amount = quantity * unit_price
+                QMessageBox.information(self, "Success",
                                     f"Sale recorded successfully!\nTotal amount: ${total_amount:.2f}")
-            self.accept()
+                self.accept()
 
         except ValueError:
-            QMessageBox.warning(
-                self, "Error", "Please enter valid numeric values.")
+            QMessageBox.warning(self, "Error", "Please enter valid numeric values.")
         except sqlite3.Error as e:
             QMessageBox.critical(self, "Database Error", str(e))
 
 
 class SalesReportDialog(QDialog):
-    def __init__(self, db, parent=None):
+    def __init__(self, parent=None):
         super().__init__(parent)
-        self.db = db
+        self.sale_dao = SaleDAO()
         self.setWindowTitle("Generate Sales Report")
         self.setMinimumWidth(500)
         self.setup_ui()
@@ -317,35 +258,10 @@ class SalesReportDialog(QDialog):
 
     def generate_report(self):
         try:
-            conn = self.db.get_connection()
-            cursor = conn.cursor()
-
             selected_date = self.date_select.date().toString('yyyy-MM-dd')
-
-            if self.report_type.currentText() == "Daily Report":
-                cursor.execute('''
-                    SELECT 
-                        i.name,
-                        SUM(s.quantity) as total_quantity,
-                        SUM(s.total_amount) as total_sales
-                    FROM sales s
-                    JOIN inventory i ON s.item_id = i.id
-                    WHERE DATE(s.sale_date) = ?
-                    GROUP BY i.name
-                ''', (selected_date,))
-            else:  # Monthly Report
-                cursor.execute('''
-                    SELECT 
-                        i.name,
-                        SUM(s.quantity) as total_quantity,
-                        SUM(s.total_amount) as total_sales
-                    FROM sales s
-                    JOIN inventory i ON s.item_id = i.id
-                    WHERE strftime('%Y-%m', s.sale_date) = ?
-                    GROUP BY i.name
-                ''', (selected_date[:7],))
-
-            sales = cursor.fetchall()
+            report_type = self.report_type.currentText()
+            
+            sales = self.sale_dao.generate_report(selected_date, report_type)
 
             self.table.setRowCount(len(sales))
             total_revenue = 0
@@ -359,10 +275,8 @@ class SalesReportDialog(QDialog):
                     cell.setFlags(cell.flags() & ~Qt.ItemFlag.ItemIsEditable)
                     self.table.setItem(row, col, cell)
 
-            self.total_revenue_label.setText(
-                f"Total Revenue: ${total_revenue:.2f}")
+            self.total_revenue_label.setText(f"Total Revenue: ${total_revenue:.2f}")
             self.table.resizeColumnsToContents()
-            conn.close()
 
         except sqlite3.Error as e:
             QMessageBox.critical(self, "Database Error", str(e))
