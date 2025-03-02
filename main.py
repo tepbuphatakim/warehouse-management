@@ -8,7 +8,7 @@ from PyQt6.QtCore import Qt, QSize
 from views.inventory import InventoryPage
 from views.sale import SaleManagementPage
 from views.return_items import ReturnItemsPage
-from views.dashboard import DashboardPage
+from views.dashboard.dashboard import DashboardPage
 
 
 class MainWindow(QMainWindow):

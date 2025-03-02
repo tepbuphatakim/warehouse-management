@@ -77,7 +77,6 @@ class InventoryPage(QMainWindow):
         if dialog.exec() == QDialog.DialogCode.Accepted:
             try:
                 data = dialog.get_item_data()
-                current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
                 self.inventory_dao.add_item(data['name'], int(data['quantity']), 
                                      float(data['price']), data['location'])
