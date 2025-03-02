@@ -3,7 +3,6 @@ from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout,
                              QTableWidgetItem, QMessageBox, QDialog, QFormLayout)
 from PyQt6.QtCore import Qt
 import sqlite3
-from datetime import datetime
 from dao.inventory_dao import InventoryDAO
 
 
@@ -78,8 +77,8 @@ class InventoryPage(QMainWindow):
             try:
                 data = dialog.get_item_data()
 
-                self.inventory_dao.add_item(data['name'], int(data['quantity']), 
-                                     float(data['price']), data['location'])
+                self.inventory_dao.add_item(data['name'], int(data['quantity']),
+                                            float(data['price']), data['location'])
 
                 self.refresh_table()
                 QMessageBox.information(
@@ -112,7 +111,7 @@ class InventoryPage(QMainWindow):
                 self.inventory_dao.update_item(
                     item_data['id'],
                     data['name'],
-                    int(data['quantity']), 
+                    int(data['quantity']),
                     float(data['price']),
                     data['location']
                 )
@@ -162,7 +161,8 @@ class InventoryPage(QMainWindow):
                         if isinstance(value, float):
                             value = f"${value:.2f}"
                         cell = QTableWidgetItem(str(value))
-                        cell.setFlags(cell.flags() & ~Qt.ItemFlag.ItemIsEditable)
+                        cell.setFlags(cell.flags() & ~
+                                      Qt.ItemFlag.ItemIsEditable)
                         self.table.setItem(row_num, col_num, cell)
 
             self.table.resizeColumnsToContents()

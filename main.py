@@ -5,9 +5,9 @@ from PyQt6.QtWidgets import (QMainWindow, QApplication, QWidget,
 from PyQt6.QtGui import QAction
 from PyQt6.QtCore import Qt, QSize
 
-from views.inventory import InventoryPage
-from views.sale import SaleManagementPage
-from views.return_items import ReturnItemsPage
+from views.inventory.inventory import InventoryPage
+from views.sale.sale import SaleManagementPage
+from views.return_items.return_items import ReturnItemsPage
 from views.dashboard.dashboard import DashboardPage
 
 

@@ -24,4 +24,3 @@ class DashboardPage(QMainWindow):
         tab_widget.addTab(InventoryPage(), "Inventory")
         tab_widget.addTab(ReturnsPage(), "Returns")
         tab_widget.addTab(LowStockPage(), "Low Stock")
-

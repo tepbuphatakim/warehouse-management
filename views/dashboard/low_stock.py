@@ -4,6 +4,7 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
 from dao.dashboard_dao import DashboardDAO
 
+
 class LowStockPage(QWidget):
     def __init__(self):
         super().__init__()
@@ -33,11 +34,16 @@ class LowStockPage(QWidget):
 
             self.low_stock_table.setRowCount(len(low_stock_items))
             for i, row in enumerate(low_stock_items):
-                self.low_stock_table.setItem(i, 0, QTableWidgetItem(row[0]))  # name
-                self.low_stock_table.setItem(i, 1, QTableWidgetItem(str(row[1])))  # quantity
-                self.low_stock_table.setItem(i, 2, QTableWidgetItem(f"${row[2]:.2f}"))  # price
-                self.low_stock_table.setItem(i, 3, QTableWidgetItem(row[3]))  # location
-                self.low_stock_table.setItem(i, 4, QTableWidgetItem(str(row[4])))  # updated_at
+                self.low_stock_table.setItem(
+                    i, 0, QTableWidgetItem(row[0]))  # name
+                self.low_stock_table.setItem(
+                    i, 1, QTableWidgetItem(str(row[1])))  # quantity
+                self.low_stock_table.setItem(
+                    i, 2, QTableWidgetItem(f"${row[2]:.2f}"))  # price
+                self.low_stock_table.setItem(
+                    i, 3, QTableWidgetItem(row[3]))  # location
+                self.low_stock_table.setItem(
+                    i, 4, QTableWidgetItem(str(row[4])))  # updated_at
 
                 # Highlight critical items (quantity < 5) in red
                 if row[1] < 5:
@@ -53,11 +59,11 @@ class LowStockPage(QWidget):
                 self.low_stock_table.setRowCount(1)
                 self.low_stock_table.setSpan(0, 0, 1, 5)
                 self.low_stock_table.setItem(0, 0,
-                                           QTableWidgetItem("No items are currently low in stock"))
+                                             QTableWidgetItem("No items are currently low in stock"))
 
         except Exception as e:
             print(f"Database error: {e}")
             self.low_stock_table.setRowCount(1)
             self.low_stock_table.setSpan(0, 0, 1, 5)
             self.low_stock_table.setItem(0, 0,
-                                       QTableWidgetItem(f"Error loading data: {str(e)}"))
+                                         QTableWidgetItem(f"Error loading data: {str(e)}"))

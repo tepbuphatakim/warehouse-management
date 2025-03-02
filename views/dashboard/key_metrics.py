@@ -5,6 +5,7 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
 from dao.dashboard_dao import DashboardDAO
 
+
 class KeyMetricsPage(QWidget):
     def __init__(self):
         super().__init__()
@@ -25,6 +26,7 @@ class KeyMetricsPage(QWidget):
             "Total Refunds", f"${metrics['total_refunds']:,.2f}"), 1, 1)
         layout.addWidget(MetricCard("Low Stock Items",
                          str(metrics['low_stock'])), 1, 2)
+
 
 class MetricCard(QFrame):
     def __init__(self, title, value, parent=None):

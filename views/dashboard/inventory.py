@@ -3,6 +3,7 @@ from PyQt6.QtWidgets import (QWidget, QVBoxLayout,
 from PyQt6.QtGui import QFont
 from dao.dashboard_dao import DashboardDAO
 
+
 class InventoryPage(QWidget):
     def __init__(self):
         super().__init__()
@@ -35,7 +36,7 @@ class InventoryPage(QWidget):
     def populate_location_summary(self, table):
         try:
             location_summary = self.dashboard_dao.get_inventory_by_location()
-            
+
             table.setRowCount(len(location_summary))
             for i, row in enumerate(location_summary):
                 table.setItem(i, 0, QTableWidgetItem(row[0]))
@@ -49,7 +50,7 @@ class InventoryPage(QWidget):
     def populate_restock_items(self, table):
         try:
             restock_items = self.dashboard_dao.get_restock_items()
-            
+
             table.setRowCount(len(restock_items))
             for i, row in enumerate(restock_items):
                 table.setItem(i, 0, QTableWidgetItem(row[0]))  # name
@@ -58,4 +59,3 @@ class InventoryPage(QWidget):
 
         except Exception as e:
             print(f"Error populating restock items: {e}")
-            
